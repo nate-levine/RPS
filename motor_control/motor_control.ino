@@ -8,15 +8,18 @@
 #include <spi4teensy3.h>
 #endif
 #include <SPI.h>
-// Motor A connections
-int enA = 10;
+// right motor connections
+uint8_t enA = 3;
 int in1 = 2;
 int in2 = 4;
-// Motor B connections
-int enB = 11;
+// left motor connections
+uint8_t enB = 5;
 int in3 = 8;
 int in4 = 7;
-// Motor B connections
+// scooper motor connections
+int in5 = 12;
+int in6 = 13;
+
 USB Usb;
 //USBHub Hub1(&Usb); // Some dongles have a hub inside
 BTD Btd(&Usb);  // You have to create the Bluetooth Dongle instance like so
@@ -34,16 +37,24 @@ uint8_t oldL2Value, oldR2Value;
 
 void setup() {
   // set pin outputs
-  pinMode(in1, OUTPUT);
+  pinMode(in1, OUTPUT); // right motor
   pinMode(in2, OUTPUT);
-  pinMode(in3, OUTPUT);
+  pinMode(enA, OUTPUT);
+  pinMode(in3, OUTPUT); // left motor
   pinMode(in4, OUTPUT);
+  pinMode(enB, OUTPUT);
+  pinMode(in5, OUTPUT); // scooper motor
+  pinMode(in6, OUTPUT);
 
   // Turn off motors initially
-  digitalWrite(in1, LOW);
+  digitalWrite(in1, LOW); // right motor
   digitalWrite(in2, LOW);
-  digitalWrite(in3, LOW);
+  analogWrite(enA, 0);
+  digitalWrite(in3, LOW); // left motor
   digitalWrite(in4, LOW);
+  analogWrite(enB, 0);
+  digitalWrite(in5, LOW); // scooper motor
+  digitalWrite(in6, LOW);
 
   // set baud rate
   Serial.begin(115200);
@@ -66,35 +77,79 @@ void setup() {
 void loop() {
   Usb.Task();
 
-  // Debugging
-  // PS4.getAnalogHat: Return the analog value in the range of 0-255. ??? at rest
-  Serial.print("Right hat: ");
-  Serial.print(abs(PS4.getAnalogHat(RightHatY) - 127));
-  Serial.print(", Left hat: ");
-  Serial.println(abs(PS4.getAnalogHat(LeftHatY) - 127));
-
   if (PS4.connected()) {
-    if (PS4.getAnalogHat(RightHatY) > 235) {
+
+    // convert hat Y pos to motor speed
+    // hat Y [0, 255] to triangle function: f(x) = abs(x - 127.5), 0 <= f(x) <= 255
+    int rightHatYOffset = abs(PS4.getAnalogHat(RightHatY) - 127.5) * 2;
+    // constrain between [0, 255]
+    if (rightHatYOffset < 0) {
+      rightHatYOffset = 0;
+    } else if (rightHatYOffset > 255) {
+      rightHatYOffset = 255;
+    }
+    int leftHatYOffset = abs(PS4.getAnalogHat(LeftHatY) - 127.5) * 2;
+    // constrain between [0, 255]
+    if (leftHatYOffset < 0) {
+      leftHatYOffset = 0;
+    } else if (leftHatYOffset > 255) {
+      leftHatYOffset = 255;
+    }
+
+  } else if 
+  
+    // right motor
+    if (PS4.getAnalogHat(RightHatY) > 137) {
       digitalWrite(in2, LOW);
       digitalWrite(in1, HIGH);
-    } else if (PS4.getAnalogHat(RightHatY) < 20) {
+      analogWrite(enA, rightHatYOffset);
+    } else if (PS4.getAnalogHat(RightHatY) < 117) {
       digitalWrite(in2, HIGH);
       digitalWrite(in1, LOW);
+      analogWrite(enA, rightHatYOffset);
     } else {
-      analogWrite(enA, 0);
       digitalWrite(in1, LOW);
       digitalWrite(in2, LOW);
+      analogWrite(enA, 0);
     }
-    if (PS4.getAnalogHat(LeftHatY) > 235) {
+    // left motor
+    if (PS4.getAnalogHat(LeftHatY) > 137) {
       digitalWrite(in4, LOW);
       digitalWrite(in3, HIGH);
-    } else if (PS4.getAnalogHat(LeftHatY) < 20) {
+      analogWrite(enB, leftHatYOffset);
+    } else if (PS4.getAnalogHat(LeftHatY) < 117) {
       digitalWrite(in4, HIGH);
       digitalWrite(in3, LOW);
+      analogWrite(enB, leftHatYOffset);
     } else {
-      analogWrite(enB, 0);
       digitalWrite(in3, LOW);
       digitalWrite(in4, LOW);
+      analogWrite(enB, 0);
     }
+    // scooper motor
+    if (PS4.getButtonPress(UP)) {  
+      digitalWrite(in5, LOW);
+      digitalWrite(in6, HIGH);
+    } else if (PS4.getButtonPress(DOWN)) {
+      digitalWrite(in5, HIGH);
+      digitalWrite(in6, LOW);
+    } else {
+      digitalWrite(in5, LOW);
+      digitalWrite(in6, LOW);
+    }
+
+    // Debug I/O
+    Serial.print("Right hat: ");
+    Serial.print(abs(PS4.getAnalogHat(RightHatY)));
+    Serial.print(", Left hat: ");
+    Serial.print(abs(PS4.getAnalogHat(LeftHatY)));
+    Serial.print(", rightHatYOffset: ");
+    Serial.print(rightHatYOffset);
+    Serial.print(", leftHatYOffset: ");
+    Serial.print(leftHatYOffset);
+    Serial.print(", pinA: ");
+    Serial.print(analogRead(enA));
+    Serial.print(", pinB: ");
+    Serial.println(analogRead(enB));
   }
 }
